@@ -55,22 +55,23 @@ def mcp_agent(tools):
 def create_mermaid_graph_task(agent, context=[])->Task:            
     return Task(
         description="""
-            Generate a mermaid graph TBD chart config file for the given usecase: {usecase}
-                            
-            Expand on any pre-existing schema and data available.
+        Generate a mermaid graph TBD chart config file for the following usecase: {usecase}
+                        
+        Add new entities and relationships to an existing graph.
+        Add properties to each entity to provide more context and detail.
+        Add relationships to each entity to provide more context and detail.
+        All entities MUST have at least one relationship to another entity.
+        """,
+        expected_output="""
+        A valid Mermaid Graph TB chart config file
+        
+        Relationships should NOT have KEYs
+        Output should NOT contain any explanatory text
+        Output should NOT contain backticks
+        Output should NOT contain code blocks
+        Output should NOT contain mermaid styling.
 
-            Add new entities and relationships to add the '{{usecase}}' usecase to the graph.
-            Add properties to each entity to provide more context and detail.
-            Add relationships to each entity to provide more context and detail.
-            All entities MUST have at least one relationship to another entity.
-
-            Relationships should NOT have KEYs
-            Output should NOT contain any explanatory text
-            Output should NOT contain backticks
-            Output should NOT contain code blocks
-            Output should NOT contain mermaid styling.
-
-            Example output:
+        Example:
 
             graph TD
             %% Nodes
@@ -87,7 +88,6 @@ def create_mermaid_graph_task(agent, context=[])->Task:
             Appointment -->|CREATES_RECORD<br/>notes: TEXT| MedicalRecord
             Doctor -->|AUTHORED_RECORD<br/>signature: STRING| MedicalRecord
         """,
-        expected_output="A valid Mermaid Graph TB chart config file",
         agent=agent,
         context=context,
         callback=log_task_callback,  # Optional
@@ -115,6 +115,45 @@ def edit_mermaid_graph_task(agent)->Task:
         callback=log_task_callback,  # Optional
     )
 
+def combine_mermaid_graph_task(agent)->Task:
+    return Task(
+        description="""
+            Combine the existing mermaid chart config file with the new mermaid chart config file.
+            
+            Existing mermaid config: 
+            {mermaid_config}
+            
+            New mermaid config: 
+            {new_mermaid_config}
+
+            Relationships should NOT have KEYs
+            Output should NOT contain any explanatory text
+            Output should NOT contain backticks
+            Output should NOT contain code blocks
+            Output should NOT contain mermaid styling.
+        """,
+        expected_output="A valid Mermaid Graph TB chart config file",
+        agent=agent,
+        callback=log_task_callback,  # Optional
+    )
+
+def combine_mermaid_graph_task_with_context(agent, context)->Task:
+    return Task(
+        description="""
+            Combine the existing mermaid chart config file with the new mermaid chart config file received from context.
+
+            Relationships should NOT have KEYs
+            Output should NOT contain any explanatory text
+            Output should NOT contain backticks
+            Output should NOT contain code blocks
+            Output should NOT contain mermaid styling.
+        """,
+        expected_output="A valid Mermaid Graph TB chart config file",
+        agent=agent,
+        context=context,
+        callback=log_task_callback,  # Optional
+    )
+
 def read_data_task(agent)->Task:
     return Task(
             description="""
@@ -125,41 +164,41 @@ def read_data_task(agent)->Task:
             callback=log_task_callback,  # Optional
         )
 
-def generate_data_task_with_recommendations(agent, context)->Task:    
-    # Mermaid graph will be passed as input
-    return Task(
-        description="""
-            Construct and upload a synthetic graph dataset based on the existing schema, a mermaid chart config file, and recommended list of node details.
+# def generate_data_task_with_recommendations(agent, context)->Task:    
+#     # Mermaid graph will be passed as input
+#     return Task(
+#         description="""
+#             Construct and upload a synthetic graph dataset based on the existing schema, a mermaid chart config file, and recommended list of node details.
 
-            Source mermaid config: 
-            {mermaid_config}
+#             Source mermaid config: 
+#             {mermaid_config}
 
-            Recommended node details: 
-            {recommendations}
+#             Recommended node details: 
+#             {recommendations}
 
-            Fill in property values with plausable names and sensible descriptions.
-            All nodes MUST have one relationship to at least one other node.
-        """,
-        expected_output="A string status report of the data upload process",
-        agent=agent,
-        context=context,
-        callback=log_task_callback,  # Optional
-    )
+#             Fill in property values with plausable names and sensible descriptions.
+#             All nodes MUST have one relationship to at least one other node.
+#         """,
+#         expected_output="A string status report of the data upload process",
+#         agent=agent,
+#         context=context,
+#         callback=log_task_callback,  # Optional
+#     )
 
-def generate_data_task_with_context(agent, context)->Task:    
-    # Mermaid graph will be passed as input
-    return Task(
-        description="""
-            Construct and upload a synthetic graph dataset based on the existing schema, a mermaid chart config file, and recommended list of node details.
+# def generate_data_task_with_context(agent, context)->Task:    
+#     # Mermaid graph will be passed as input
+#     return Task(
+#         description="""
+#             Construct and upload a synthetic graph dataset based on the existing schema, a mermaid chart config file, and recommended list of node details.
 
-            Fill in property values with plausable names and sensible descriptions.
-            All nodes MUST have one relationship to at least one other node.
-        """,
-        expected_output="A string status report of the data upload process",
-        agent=agent,
-        context=context,
-        callback=log_task_callback,  # Optional
-    )
+#             Fill in property values with plausable names and sensible descriptions.
+#             All nodes MUST have one relationship to at least one other node.
+#         """,
+#         expected_output="A string status report of the data upload process",
+#         agent=agent,
+#         context=context,
+#         callback=log_task_callback,  # Optional
+#     )
 
 def generate_data_task_with_context(agent, context)->Task: 
     # Mermaid graph and counts will be passed in from prior tasks
@@ -198,12 +237,25 @@ def create_mermaid_graph(usecase: str):
         read_agent = mcp_agent([tools["get_neo4j_schema"], tools["read_neo4j_cypher"]])
         read_task = read_data_task(read_agent)
 
-        agent = mcp_agent([tools["validate_data_model"], tools["get_mermaid_config_str"]])
-        task = create_mermaid_graph_task(agent, [read_task])
+        # TODO
+        # Create mermaid graph of existing data
+        mermaid_agent = mcp_agent([tools["get_mermaid_config_str"]])
+        existing_mermaid_task = create_mermaid_graph_task(mermaid_agent, [read_task])
+
+        # TODO
+        # Create mermaid graph of usecase
+        usecase_mermaid_task = create_mermaid_graph_task(mermaid_agent, [read_task])
+
+        # TODO
+        # Composite mermaid graphs
+        composite_mermaid_task = combine_mermaid_graph_task(mermaid_agent, [existing_mermaid_task, usecase_mermaid_task])
+
+        # agent = mcp_agent(tools["get_mermaid_config_str"]])
+        # task = create_mermaid_graph_task(agent, [composite_mermaid_task])
 
         crew = Crew(
-            agents=[read_agent, agent],
-            tasks=[read_task, task],
+            agents=[read_agent, mermaid_agent],
+            tasks=[read_task, existing_mermaid_task, usecase_mermaid_task, composite_mermaid_task],
             process=Process.sequential,
             verbose=True,
         )
@@ -242,85 +294,235 @@ def edit_mermaid_graph(instructions: str, mermaid_config: str):
             print(f"Error details: {error_trace}")
             raise Exception(f"An error occurred while running the crew: {str(e)}\n\nTraceback:\n{error_trace}")
 
+
+def combine_mermaid_graphs(mermaid_config: str, new_mermaid_config: str):
+    """Edit a mermaid chart config file."""
+    with MCPServerAdapter(server_params) as tools:
+        print(f"Available tools from Stdio MCP server: {[tool.name for tool in tools]}")
+        
+        agent = mcp_agent([tools["validate_data_model"], tools["get_mermaid_config_str"]])
+
+        task = combine_mermaid_graph_task(agent)
+
+        inputs = {
+            'mermaid_config': mermaid_config,
+            'new_mermaid_config': new_mermaid_config
+        }
+        
+        try:
+            crew = Crew(
+                agents=[agent],
+                tasks=[task],
+                process=Process.sequential,
+                verbose=True,
+            )
+            result = crew.kickoff(inputs=inputs)
+            return result
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error details: {error_trace}")
+            raise Exception(f"An error occurred while running the crew: {str(e)}\n\nTraceback:\n{error_trace}")
+
 # Models for structured outputs
-class RecommendedNodeSpecs(BaseModel):
-    label: str = Field(description="Label or category of the node (ie Employee)")
-    description: str = Field(description="Description of the node (ie a person who works for a company)")
-    properties: list[str] = Field(description="List of properties for the node. Always include an 'id' and 'name'")
-    count: int = Field(description="Number of nodes to generate")
+# class RecommendedNodeSpecs(BaseModel):
+#     label: str = Field(description="Label or category of the node (ie Employee)")
+#     description: str = Field(description="Description of the node (ie a person who works for a company)")
+#     properties: list[str] = Field(description="List of properties for the node. Always include an 'id' and 'name'")
+#     count: int = Field(description="Number of nodes to generate")
 
-class Recommendations(BaseModel):
-    nodes: list[RecommendedNodeSpecs]
+# class Recommendations(BaseModel):
+#     nodes: list[RecommendedNodeSpecs]
 
-def recommendation_task(agent)->Task:
-    """Mermaid graph will need to be passed in as input"""
-    description = """
-        Analyze the following mermaid graph and determine the minimum number of nodes needed to create a comprehensive graph dataset.
+# def recommendation_task(agent)->Task:
+#     """Mermaid graph will need to be passed in as input"""
+#     description = """
+#         Analyze the following mermaid graph and determine the minimum number of nodes needed to create a comprehensive graph dataset.
                             
-        Mermaid graph: 
-        {mermaid_graph}
+#         Mermaid graph: 
+#         {mermaid_graph}
 
-        Return a list of data about 3x the minimum number deteremined, to create a comprehensive yet interesting graph dataset.
+#         Return a list of data about 3x the minimum number deteremined, to create a comprehensive yet interesting graph dataset.
         
-        Example Output:
+#         Example Output:
 
-        [
-            { label: "Employee", description: "A person who works for a company", properties: ["id", "name", "email"], count: 25 },
-            { label: "Company", description: "A business entity", properties: ["id", "name"], count: 3 }
-            { label: "Location", description: "A physical location", properties: ["id", "name", "address"], count: 1 }
-        ]
-        """
-    return Task(
-        description=description,
-        expected_output="A list of dictionaries with recommended node labels, description, properties (as a list of strings), and counts",
-        output_json=Recommendations,
-        agent=agent,
-        callback=log_task_callback,  # Optional
-    )
+#         [
+#             { label: "Employee", description: "A person who works for a company", properties: ["id", "name", "email"], count: 25 },
+#             { label: "Company", description: "A business entity", properties: ["id", "name"], count: 3 }
+#             { label: "Location", description: "A physical location", properties: ["id", "name", "address"], count: 1 }
+#         ]
+#         """
+#     return Task(
+#         description=description,
+#         expected_output="A list of dictionaries with recommended node labels, description, properties (as a list of strings), and counts",
+#         output_json=Recommendations,
+#         agent=agent,
+#         callback=log_task_callback,  # Optional
+#     )
 
-def recommendation_task_with_context(agent, context)->Task:
-    # Mermaid graph will be passed from the prior task
-    description = """
-        Analyze the following mermaid graph and determine the minimum number of nodes needed to create a comprehensive graph dataset.
+# def recommendation_task_with_context(agent, context)->Task:
+#     # Mermaid graph will be passed from the prior task
+#     description = """
+#         Analyze the following mermaid graph and determine the minimum number of nodes needed to create a comprehensive graph dataset.
 
-        Return a list of data about 3x the minimum number deteremined, to create a comprehensive yet interesting graph dataset.
+#         Return a list of data about 3x the minimum number deteremined, to create a comprehensive yet interesting graph dataset.
         
-        Example Output:
+#         Example Output:
 
-        [
-            { label: "Employee", description: "A person who works for a company", properties: ["id", "name", "email"], count: 25 },
-            { label: "Company", description: "A business entity", properties: ["id", "name"], count: 3 }
-            { label: "Location", description: "A physical location", properties: ["id", "name", "address"], count: 1 }
-        ]
-    """
-    return Task(
-        description=description,
-        expected_output="A list of dictionaries with recommended node labels, description, properties (as a list of strings), and counts",
-        output_json=Recommendations,
-        agent=agent,
-        context=context,
-        callback=log_task_callback,  # Optional
-    )
+#         [
+#             { label: "Employee", description: "A person who works for a company", properties: ["id", "name", "email"], count: 25 },
+#             { label: "Company", description: "A business entity", properties: ["id", "name"], count: 3 }
+#             { label: "Location", description: "A physical location", properties: ["id", "name", "address"], count: 1 }
+#         ]
+#     """
+#     return Task(
+#         description=description,
+#         expected_output="A list of dictionaries with recommended node labels, description, properties (as a list of strings), and counts",
+#         output_json=Recommendations,
+#         agent=agent,
+#         context=context,
+#         callback=log_task_callback,  # Optional
+#     )
 
-# Recommendation Agent
-def recommendation_agent()-> Agent:
+# # Recommendation Agent
+# def recommendation_agent()-> Agent:
+#     return Agent(
+#         role="Graph Data Expert",
+#         goal="Recommend the lable and number of nodes needed to create a comprehensive graph dataset for the given mermaid graph.",
+#         backstory="I am an expert in graph data and can recommend the number of nodes needed to create a comprehensive graph dataset.",
+#         reasoning=False,  # Optional
+#         verbose=False,  # Optional
+#         step_callback=log_step_callback,  # Optional
+#     )
+
+# def generate_recommendations(mermaid_graph: str):
+#     """Generate a recommendation for the number of nodes needed to create a comprehensive graph dataset."""
+#     with MCPServerAdapter(server_params) as tools:
+#         print(f"Available tools from Stdio MCP server: {[tool.name for tool in tools]}")
+        
+#         try:
+#             agent = recommendation_agent()
+#             task = recommendation_task(agent)
+#             crew = Crew(
+#                 agents=[agent],
+#                 tasks=[task],
+#                 process=Process.sequential,
+#                 verbose=True,
+#             )
+#             inputs = {
+#                 'mermaid_graph': mermaid_graph
+#             }
+#             result = crew.kickoff(inputs=inputs)
+#             return result
+#         except Exception as e:
+#             import traceback
+#             error_trace = traceback.format_exc()
+#             print(f"Error details: {error_trace}")
+#             raise Exception(f"An error occurred while running the crew: {str(e)}\n\nTraceback:\n{error_trace}")
+
+
+def graph_agent()-> Agent:
     return Agent(
         role="Graph Data Expert",
-        goal="Recommend the lable and number of nodes needed to create a comprehensive graph dataset for the given mermaid graph.",
-        backstory="I am an expert in graph data and can recommend the number of nodes needed to create a comprehensive graph dataset.",
+        goal="Generate records from a mermaid chart config file.",
+        backstory="I am an expert in graph data and can synthesize plausable mock data for graph datasets.",
         reasoning=False,  # Optional
         verbose=False,  # Optional
         step_callback=log_step_callback,  # Optional
     )
 
-def generate_recommendations(mermaid_graph: str):
-    """Generate a recommendation for the number of nodes needed to create a comprehensive graph dataset."""
+def generate_records_task(agent, context)->Task:
+    """Generate records from a mermaid chart config file."""
+    description = """
+        Generate records from a mermaid chart config file.
+        
+        Mermaid graph: 
+        {mermaid_graph}
+
+        Records MUST contain an 'id' property. Values are integers starting from 1.
+        Records MUST contain a 'name' property. Unique and appropriate for the node label.
+        Any properties referring to another node MUST use the 'id' property of the other node.
+        Output should ONLY be a list of dictionaries.
+        Output should NOT contain any explanatory text.
+        Output should NOT contain any backticks.
+        Output should NOT contain any code blocks.
+
+        Example output:
+        [
+            {
+                "label":"Employee",
+                "id": 1,
+                "name": "Jean Luc Picard",
+                "description": "Captain of the USS Enterprise",
+                "email": "captain.picard@starfleet.com",
+            },
+            {
+                "label":"Employee",
+                "id": 2,
+                "name": "Data",
+                "description": "A humanoid android created by Dr. Noonien Soong",
+                "email": "data@starfleet.com",
+            }
+        ]
+    """
+    return Task(
+        description=description,
+        expected_output="A list of dictionaries containing node details (label, id, name, description, and any other relevant properties)",
+        agent=agent,
+        context=context,
+        callback=log_task_callback,  # Optional
+    )
+
+def generate_records_task_with_context(agent, context)->Task:
+    """Generate records from a mermaid chart config file."""
+    description = """
+        Generate records from a mermaid chart config file.
+
+        Records MUST contain an 'id' property. Values are integers starting from 1.
+        Records MUST contain a 'name' property. Unique and appropriate for the node label.
+        Any properties referring to another node MUST use the 'id' property of the other node.
+        Output should ONLY be a list of dictionaries.
+        Output should NOT contain any explanatory text.
+        Output should NOT contain any backticks.
+        Output should NOT contain any code blocks.
+
+        Example output:
+        [
+            {
+                "label":"Employee",
+                "id": 1,
+                "name": "Jean Luc Picard",
+                "description": "Captain of the USS Enterprise",
+                "email": "captain.picard@starfleet.com",
+            },
+            {
+                "label":"Employee",
+                "id": 2,
+                "name": "Data",
+                "description": "A humanoid android created by Dr. Noonien Soong",
+                "email": "data@starfleet.com",
+            }
+        ]
+    """
+    return Task(
+        description=description,
+        expected_output="A list of dictionaries containing node details (label, id, name, description, and any other relevant properties)",
+        agent=agent,
+        context=context,
+        callback=log_task_callback,  # Optional
+    )
+
+def generate_records(mermaid_graph: str):
+    """Generate records from a mermaid chart config file."""
     with MCPServerAdapter(server_params) as tools:
         print(f"Available tools from Stdio MCP server: {[tool.name for tool in tools]}")
         
         try:
-            agent = recommendation_agent()
-            task = recommendation_task(agent)
+            read_agent = mcp_agent([tools["get_neo4j_schema"], tools["read_neo4j_cypher"]])
+            read_task = read_data_task(read_agent)
+
+            agent = graph_agent()
+            task = generate_records_task(agent, [read_task])
             crew = Crew(
                 agents=[agent],
                 tasks=[task],
@@ -338,6 +540,42 @@ def generate_recommendations(mermaid_graph: str):
             print(f"Error details: {error_trace}")
             raise Exception(f"An error occurred while running the crew: {str(e)}\n\nTraceback:\n{error_trace}")
 
+def generate_data_task(agent, context)->Task:
+    """Generate data from a mermaid chart config file."""
+    description = """
+        Generate data from a mermaid graph and list of records.
+        
+        Mermaid graph: 
+        {mermaid_graph}
+
+        Records: 
+        {records}
+
+        Create relationships between nodes based on the Mermaid graph and relevant record properties.
+    """
+    return Task(
+        description=description,
+        expected_output="A list of dictionaries containing node details (label, id, name, description, and any other relevant properties)",
+        agent=agent,
+        context=context,
+        callback=log_task_callback,  # Optional
+    )
+
+def generate_data_task_with_context(agent, context)->Task:
+    """Generate data from a mermaid chart config file."""
+    description = """
+        Generate data from a mermaid graph and list of records.
+
+        Create relationships between nodes based on the Mermaid graph and relevant record properties.
+    """
+    return Task(
+        description=description,
+        expected_output="A list of dictionaries containing node details (label, id, name, description, and any other relevant properties)",
+        agent=agent,
+        context=context,
+        callback=log_task_callback,  # Optional
+    )
+
 from neo4j import GraphDatabase
 
 def trim_orphan_nodes() -> str:
@@ -352,7 +590,7 @@ def trim_orphan_nodes() -> str:
         result = driver.execute_query(cypher_query)
         return result
 
-def generate_data(mermaid_graph: str, recommendations: list[dict]):
+def generate_data(mermaid_graph: str, records: list[dict]):
     """Generate data from a mermaid chart config file."""
 
     with MCPServerAdapter(server_params) as tools:
@@ -367,7 +605,7 @@ def generate_data(mermaid_graph: str, recommendations: list[dict]):
             write_agent = mcp_agent([tools["write_neo4j_cypher"]])
 
             read_task = read_data_task(read_agent)
-            write_task = generate_data_task_with_recommendations(write_agent, [read_task])
+            write_task = generate_data_task(write_agent, [read_task])
 
             crew = Crew(
                     agents=[read_agent, write_agent],
@@ -377,8 +615,8 @@ def generate_data(mermaid_graph: str, recommendations: list[dict]):
                 )
             
             inputs = {
-                'mermaid_config': mermaid_graph,
-                'recommendations': recommendations
+                'mermaid_graph': mermaid_graph,
+                'records': records
             }
 
             result = crew.kickoff(inputs=inputs)
@@ -408,14 +646,13 @@ def generate_data_for_usecase(usecase: str):
             data_modeling_task = create_mermaid_graph_task(data_modeling_agent, [schema_task])
             
             # Generate recommended nodes and counts
-            spec_recommendation_agent = recommendation_agent()
-            spec_recommendation_task = recommendation_task_with_context(spec_recommendation_agent, [data_modeling_task])
+            records_agent = graph_agent() 
+            records_task = generate_records_task_with_context(records_agent, [data_modeling_task])
 
             # Generate the Data
-            # read_agent = mcp_agent([tools["get_neo4j_schema"], tools["read_neo4j_cypher"]])
             read_task = read_data_task(read_agent)
             write_agent = mcp_agent([tools["write_neo4j_cypher"]])
-            write_task = generate_data_task_with_context(write_agent, [data_modeling_task, read_task])
+            write_task = generate_data_task_with_context(write_agent, [read_task, data_modeling_task, records_task])
 
             # Trim any orphaned nodes
             # Uncomment if wanting to use the MCP servers to do this instead
@@ -424,7 +661,7 @@ def generate_data_for_usecase(usecase: str):
             # Create crew instance with configurations
             crew = Crew(
                 agents=[data_modeling_agent, read_agent, write_agent],
-                tasks=[schema_task, data_modeling_task, spec_recommendation_task, read_task, write_task],
+                tasks=[schema_task, data_modeling_task, records_task, read_task, write_task],
                 process=Process.sequential,
                 verbose=True,
             )
