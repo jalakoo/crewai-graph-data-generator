@@ -1,10 +1,11 @@
-from fastapi import FastAPI
-from crew_mcp_only import create_mermaid_graph as create_mermaid_graph_mcp_only, edit_mermaid_graph as edit_mermaid_graph_mcp_only, generate_data as generate_data_mcp_only, generate_data_for_usecase as generate_data_for_usecase_mcp_only
+from fastapi import FastAPI, Body
+from crew_mcp_only import create_mermaid_graph as create_mermaid_graph_mcp_only, edit_mermaid_graph as edit_mermaid_graph_mcp_only, generate_recommendations as generate_recommendations_mcp_only, generate_data as generate_data_mcp_only, generate_data_for_usecase as generate_data_for_usecase_mcp_only
 from fastapi.responses import Response
 from fastapi import Query, HTTPException
-from typing import Callable, Any, TypeVar, cast
-import base64
+from typing import Callable, Any, TypeVar, List, Dict, Optional, cast
+from pydantic import BaseModel, Field
 import time
+import base64
 import logging
 import functools
 from dotenv import load_dotenv
@@ -133,17 +134,47 @@ async def edit_mermaid_graph_mcp_only_endpoint(
     mermaid_graph = base64.b64decode(mermaid_graph_base64.encode()).decode('utf-8')
 
     result = edit_mermaid_graph_mcp_only(instructions, mermaid_graph)
+        
+    return Response(content=result.raw, media_type="text/plain")
+
+@app.post("/mcp_only/generate_recommendations", tags=["MCP Only"])
+@time_logging("generate_recommendations_mcp_only_endpoint")
+async def generate_recommendations_mcp_only_endpoint(
+    mermaid_graph_base64: str = Query(..., 
+    description="Base64 encoded string of the mermaid graph configuration",
+    example="Z3JhcGggVEQKICAgICUlIE5vZGVzCiAgICBDb21wYW55WyJDb21wYW55PGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HPGJyLz5JbmR1c3RyeTogU1RSSU5HIl0gCiAgICBEZXBhcnRtZW50WyJEZXBhcnRtZW50PGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HPGJyLz5EZXNjcmlwdGlvbjogU1RSSU5HIl0gCiAgICBNYW5hZ2VyWyJNYW5hZ2VyPGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HIl0KICAgIEVtcGxveWVlWyJFbXBsb3llZTxici8+SWQ6IElOVEVHRVIgfCBLRVk8YnIvPk5hbWU6IFNUUklORzxici8+RXhwZXJpZW5jZTogU1RSSU5HPGJyLz5Db250YWN0SW5mbzogVEVYVCJdIAoKICAgICUlIFJlbGF0aW9uc2hpcHMKICAgIENvbXBhbnkgLS0+fEhBU19ERVBBUlRNRU5UIC0gZGVwYXJ0bWVudERldGFpbHMgU1RSSU5HfCBEZXBhcnRtZW50CiAgICBFbXBsb3llZSAtLT58V09SS1NfSU4gLSBqb2JUaXRsZSBTVFJJTkd8IERlcGFydG1lbnQKICAgIE1hbmFnZXIgLS0+fExFQURTIC0gdGVhbUdvYWwgU1RSSU5HfCBEZXBhcnRtZW50CiAgICBFbXBsb3llZSAtLT58RU1QTE9ZRURfQlkgLSBjb21wYW55SW5kdXN0cnkgU1RSSU5HfCBDb21wYW55CiAgICBFbXBsb3llZSAtLT58TUFOQUdFRF9CWSAtIG1hbmFnZXJOYW1lIFNUUklOR3wgTWFuYWdlcg==")
+):
+    """
+    Generate recommendations for a given mermaid graph configuration using CrewAI + Neo4j MCP Servers
+    """
     
-    print(f'edit_mermaid_graph_mcp_only_endpoint output: {result}')
-    
+    mermaid_graph = base64.b64decode(mermaid_graph_base64.encode()).decode('utf-8')
+
+    result = generate_recommendations_mcp_only(mermaid_graph)
+        
     return Response(content=result.raw, media_type="text/plain")
 
 @app.post("/mcp_only/generate_data", tags=["MCP Only"])
 @time_logging("generate_data_endpoint_mcp_only_endpoint")
 async def generate_data_endpoint_mcp_only_endpoint(
     mermaid_graph_base64: str = Query(..., 
-    description="Base64 encoded string of the mermaid graph configuration",
-    example="Z3JhcGggVEQKICAgICUlIE5vZGVzCiAgICBDb21wYW55WyJDb21wYW55PGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HPGJyLz5JbmR1c3RyeTogU1RSSU5HIl0gCiAgICBEZXBhcnRtZW50WyJEZXBhcnRtZW50PGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HPGJyLz5EZXNjcmlwdGlvbjogU1RSSU5HIl0gCiAgICBNYW5hZ2VyWyJNYW5hZ2VyPGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HIl0KICAgIEVtcGxveWVlWyJFbXBsb3llZTxici8+SWQ6IElOVEVHRVIgfCBLRVk8YnIvPk5hbWU6IFNUUklORzxici8+RXhwZXJpZW5jZTogU1RSSU5HPGJyLz5Db250YWN0SW5mbzogVEVYVCJdIAoKICAgICUlIFJlbGF0aW9uc2hpcHMKICAgIENvbXBhbnkgLS0+fEhBU19ERVBBUlRNRU5UIC0gZGVwYXJ0bWVudERldGFpbHMgU1RSSU5HfCBEZXBhcnRtZW50CiAgICBFbXBsb3llZSAtLT58V09SS1NfSU4gLSBqb2JUaXRsZSBTVFJJTkd8IERlcGFydG1lbnQKICAgIE1hbmFnZXIgLS0+fExFQURTIC0gdGVhbUdvYWwgU1RSSU5HfCBEZXBhcnRtZW50CiAgICBFbXBsb3llZSAtLT58RU1QTE9ZRURfQlkgLSBjb21wYW55SW5kdXN0cnkgU1RSSU5HfCBDb21wYW55CiAgICBFbXBsb3llZSAtLT58TUFOQUdFRF9CWSAtIG1hbmFnZXJOYW1lIFNUUklOR3wgTWFuYWdlcg=="),
+        description="Base64 encoded string of the mermaid graph configuration",
+        example="Z3JhcGggVEQKICAgICUlIE5vZGVzCiAgICBDb21wYW55WyJDb21wYW55PGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HPGJyLz5JbmR1c3RyeTogU1RSSU5HIl0gCiAgICBEZXBhcnRtZW50WyJEZXBhcnRtZW50PGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HPGJyLz5EZXNjcmlwdGlvbjogU1RSSU5HIl0gCiAgICBNYW5hZ2VyWyJNYW5hZ2VyPGJyLz5JZDogSU5URUdFUiB8IEtFWTxici8+TmFtZTogU1RSSU5HIl0KICAgIEVtcGxveWVlWyJFbXBsb3llZTxici8+SWQ6IElOVEVHRVIgfCBLRVk8YnIvPk5hbWU6IFNUUklORzxici8+RXhwZXJpZW5jZTogU1RSSU5HPGJyLz5Db250YWN0SW5mbzogVEVYVCJdIAoKICAgICUlIFJlbGF0aW9uc2hpcHMKICAgIENvbXBhbnkgLS0+fEhBU19ERVBBUlRNRU5UIC0gZGVwYXJ0bWVudERldGFpbHMgU1RSSU5HfCBEZXBhcnRtZW50CiAgICBFbXBsb3llZSAtLT58V09SS1NfSU4gLSBqb2JUaXRsZSBTVFJJTkd8IERlcGFydG1lbnQKICAgIE1hbmFnZXIgLS0+fExFQURTIC0gdGVhbUdvYWwgU1RSSU5HfCBEZXBhcnRtZW50CiAgICBFbXBsb3llZSAtLT58RU1QTE9ZRURfQlkgLSBjb21wYW55SW5kdXN0cnkgU1RSSU5HfCBDb21wYW55CiAgICBFbXBsb3llZSAtLT58TUFOQUdFRF9CWSAtIG1hbmFnZXJOYW1lIFNUUklOR3wgTWFuYWdlcg=="),
+    recommendations: dict = Body(..., 
+        description="List of recommendations for the number of nodes needed to create a comprehensive graph dataset",
+        example="""
+        {
+            "nodes": [
+                { "label": "Company", "description": "A business entity that oversees various departments and employees", "properties": ["id", "name", "industry"], "count": 3 },
+                { "label": "Department", "description": "A specific division within a company focusing on particular functions", "properties": ["id", "name", "description"], "count": 9 },
+                { "label": "Manager", "description": "An individual responsible for overseeing a department's operations and team", "properties": ["id", "name"], "count": 6 },
+                { "label": "Employee", "description": "A person who works for a company in various departments with specific roles", "properties": ["id", "name", "experience", "contactInfo"], "count": 75 },
+                { "label": "Project", "description": "An initiative undertaken by a department containing tasks and goals", "properties": ["id", "name", "deadline", "status"], "count": 12 },
+                { "label": "Job Title", "description": "The specific title assigned to an employee within a department", "properties": ["id", "title"], "count": 15 }
+            ]
+        }
+        """
+    )
 ):
     """
     Generate and upload synthetic graph dataset to Neo4j from a Mermaid Graph TB configuration.
@@ -167,8 +198,8 @@ async def generate_data_endpoint_mcp_only_endpoint(
     #     Employee -->|MANAGED_BY - managerName STRING| Manager
 
     mermaid_graph = base64.b64decode(mermaid_graph_base64.encode()).decode('utf-8')
-
-    output = generate_data_mcp_only(mermaid_graph)
+    
+    output = generate_data_mcp_only(mermaid_graph, recommendations)
     
     return output
 
