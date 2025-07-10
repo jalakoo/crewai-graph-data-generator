@@ -1,0 +1,97 @@
+read_data_task:
+  description: >
+    Read the existing schema and data of the neo4j database.
+  expected_output: >
+    The existing schema and data of the neo4j database
+  agent: mcp_agent
+
+create_mermaid_task:
+  description: >
+    Generate a mermaid graph TBD chart config file for the given usecase: {usecase}
+                                
+    Include these entities:
+    {entities}
+
+    Add properties to each entity to provide more context and detail.
+    Add relationships to each entity to provide more context and detail.
+    Each entity MUST be the source of 1 or more relationships.
+    Each entity MUST be the target of 1 or more relationships.
+
+    Include these relationships:
+    {relationships}
+
+    Relationships should NOT have KEYs
+    Output should NOT contain any explanatory text
+    Output should NOT contain backticks
+    Output should NOT contain code blocks
+    Output should NOT contain mermaid styling.
+
+    Example output:
+
+    graph TD
+    %% Nodes
+    Hospital["Hospital<br/>id: INTEGER | KEY<br/>name: STRING<br/>location: STRING"]
+    Patient["Patient<br/>id: INTEGER | KEY<br/>name: STRING<br/>birthDate: DATE"]
+    Doctor["Doctor<br/>id: INTEGER | KEY<br/>name: STRING<br/>specialty: STRING"]
+    Appointment["Appointment<br/>id: INTEGER | KEY<br/>appointmentDate: DATETIME<br/>reason: STRING"]
+    MedicalRecord["MedicalRecord<br/>id: INTEGER | KEY<br/>description: STRING<br/>createdAt: DATETIME<br/>notes: TEXT"]
+
+    %% Relationships
+    Patient -->|HAS_APPOINTMENT<br/>appointmentStatus: STRING| Appointment
+    Patient -->|HAS_MEDICAL_RECORD<br/>recordStatus: STRING| MedicalRecord
+    Doctor -->|TREATED<br/>treatmentDetails: STRING| Patient
+    Appointment -->|ASSIGNED_DOCTOR<br/>appointmentReason: STRING| Doctor
+    Appointment -->|CREATES_RECORD<br/>notes: TEXT| MedicalRecord
+    Appointment -->|LOCATED_AT<br/>| Hospital
+    Doctor -->|AUTHORED_RECORD<br/>signature: STRING| MedicalRecord
+  expected_output: >
+    A valid Mermaid Graph TB chart config file
+  agent: mcp_agent
+
+
+# create_mermaid_task:
+#   description: >
+#     Generate a mermaid graph TBD chart config file for the given usecase: {usecase}
+
+#     Relationships should NOT have KEYs
+
+#     Example output:
+
+#     graph TD
+#     %% Nodes
+#     Hospital["Hospital<br/>id: INTEGER | KEY<br/>name: STRING<br/>location: STRING"]
+#     Patient["Patient<br/>id: INTEGER | KEY<br/>name: STRING<br/>birthDate: DATE"]
+#     Doctor["Doctor<br/>id: INTEGER | KEY<br/>name: STRING<br/>specialty: STRING"]
+#     Appointment["Appointment<br/>id: INTEGER | KEY<br/>appointmentDate: DATETIME<br/>reason: STRING"]
+#     MedicalRecord["MedicalRecord<br/>id: INTEGER | KEY<br/>description: STRING<br/>createdAt: DATETIME<br/>notes: TEXT"]
+
+#     %% Relationships
+#     Patient -->|HAS_APPOINTMENT<br/>appointmentStatus: STRING| Appointment
+#     Patient -->|HAS_MEDICAL_RECORD<br/>recordStatus: STRING| MedicalRecord
+#     Doctor -->|TREATED<br/>treatmentDetails: STRING| Patient
+#     Appointment -->|ASSIGNED_DOCTOR<br/>appointmentReason: STRING| Doctor
+#     Appointment -->|CREATES_RECORD<br/>notes: TEXT| MedicalRecord
+#     Appointment -->|LOCATED_AT<br/>| Hospital
+#     Doctor -->|AUTHORED_RECORD<br/>signature: STRING| MedicalRecord
+#   expected_output: >
+#     A valid Mermaid Graph TB chart config file, no explanatory text, backticks, code blocks, or mermaid styling
+#   agent: mcp_agent
+
+edit_mermaid_task:
+  description: >
+    Modify an existing mermaid chart config file based on the given instructions. 
+    
+    Instructions: 
+    {instructions}
+    
+    Existing mermaid config: 
+    {mermaid_config}
+
+    Relationships should NOT have KEYs
+    Output should NOT contain any explanatory text
+    Output should NOT contain backticks
+    Output should NOT contain code blocks
+    Output should NOT contain mermaid styling.
+  expected_output: >
+    A valid Mermaid Graph TB chart config file
+  agent: mcp_agent

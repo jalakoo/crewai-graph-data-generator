@@ -1,5 +1,7 @@
 from crewai import Agent, Task, Crew, Process
 from crewai_tools import MCPServerAdapter
+from crews.crew_create_mermaid import CreateMermaidCrew
+from crews.crew_edit_mermaid import EditMermaidCrew
 from mcp import StdioServerParameters
 from neo4j import GraphDatabase
 import warnings
@@ -32,7 +34,6 @@ def log_step_callback(output):
     """
     )
 
-
 def log_task_callback(output):
     print(
         f"""
@@ -54,75 +55,6 @@ def mcp_agent(tools):
     )
 
 # Task definitions
-def create_mermaid_graph_task(agent, context=[])->Task:            
-    return Task(
-        description="""
-            Generate a mermaid graph TBD chart config file for the given usecase: {usecase}
-                            
-            Include these entities:
-            {entities}
-
-            Add properties to each entity to provide more context and detail.
-            Add relationships to each entity to provide more context and detail.
-            Each entity MUST be the source of 1 or more relationships.
-            Each entity MUST be the target of 1 or more relationships.
-
-            Include these relationships:
-            {relationships}
-
-            Relationships should NOT have KEYs
-            Output should NOT contain any explanatory text
-            Output should NOT contain backticks
-            Output should NOT contain code blocks
-            Output should NOT contain mermaid styling.
-
-            Example output:
-
-            graph TD
-            %% Nodes
-            Hospital["Hospital<br/>id: INTEGER | KEY<br/>name: STRING<br/>location: STRING"]
-            Patient["Patient<br/>id: INTEGER | KEY<br/>name: STRING<br/>birthDate: DATE"]
-            Doctor["Doctor<br/>id: INTEGER | KEY<br/>name: STRING<br/>specialty: STRING"]
-            Appointment["Appointment<br/>id: INTEGER | KEY<br/>appointmentDate: DATETIME<br/>reason: STRING"]
-            MedicalRecord["MedicalRecord<br/>id: INTEGER | KEY<br/>description: STRING<br/>createdAt: DATETIME<br/>notes: TEXT"]
-
-            %% Relationships
-            Patient -->|HAS_APPOINTMENT<br/>appointmentStatus: STRING| Appointment
-            Patient -->|HAS_MEDICAL_RECORD<br/>recordStatus: STRING| MedicalRecord
-            Doctor -->|TREATED<br/>treatmentDetails: STRING| Patient
-            Appointment -->|ASSIGNED_DOCTOR<br/>appointmentReason: STRING| Doctor
-            Appointment -->|CREATES_RECORD<br/>notes: TEXT| MedicalRecord
-            Appointment -->|LOCATED_AT<br/>| Hospital
-            Doctor -->|AUTHORED_RECORD<br/>signature: STRING| MedicalRecord
-        """,
-        expected_output="A valid Mermaid Graph TB chart config file",
-        agent=agent,
-        context=context,
-        callback=log_task_callback,  # Optional
-    )
-
-def edit_mermaid_graph_task(agent)->Task:
-    return Task(
-        description="""
-            Modify an existing mermaid chart config file based on the given instructions. 
-            
-            Instructions: 
-            {instructions}
-            
-            Existing mermaid config: 
-            {mermaid_config}
-
-            Relationships should NOT have KEYs
-            Output should NOT contain any explanatory text
-            Output should NOT contain backticks
-            Output should NOT contain code blocks
-            Output should NOT contain mermaid styling.
-        """,
-        expected_output="A valid Mermaid Graph TB chart config file",
-        agent=agent,
-        callback=log_task_callback,  # Optional
-    )
-
 def read_data_task(agent)->Task:
     return Task(
             description="""
@@ -186,43 +118,39 @@ def generate_data_task_with_context(agent, context)->Task:
             MAKE CERTAIN to create a connected graph (where all nodes have a path to all other nodes).
             Add additional Nodes and Relationships to create a connected graph.
         """,
-        # description="""
-        #     Add and upload a synthetic graph dataset based on the context data.
-            
-        #     Fill in node property details with creative and interesting data, including plausable names and sensible descriptions for the usecase.
-        #     All nodes MUST have at least one relationship to another node.
-        #     Add
-        # """,
         expected_output="A string status report of the data upload process",
         agent=agent,
         context=context,
         callback=log_task_callback,  # Optional
     )
 
-def expanded_mermaid_graph_task(agent, context)-> Task:
-    # Create a composite mermaid graph from earlier data and new data
+def expanded_mermaid_graph_task(agent, context)->Task: 
+    # Mermaid graph and counts will be passed in from prior tasks
     return Task(
-        description = """
-            Create a mermaid graph of the context data and composite it with new entities and relationships for the following usecase:
-
-            {usecase}
+        description="""
+            Expand the existing graph dataset based on the context data.
+            
+            MAKE CERTAIN to create a connected graph (where all nodes have a path to all other nodes).
+            Add additional Nodes and Relationships to create a connected graph.
         """,
-        expected_output="A mermaid graph",
+        expected_output="A string status report of the data upload process",
         agent=agent,
         context=context,
         callback=log_task_callback,  # Optional
     )
 
-# Alternate to using Neo4j Python driver
-# def trim_orphan_nodes_task(agent)->Task:
-#     return Task(
-#         description="""
-#             Delete all nodes with no relationships.
-#         """,
-#         expected_output="A string status report of the graph trimming process",
-#         agent=agent,
-#         callback=log_task_callback,  # Optional
-#     )
+# Convenience Neo4j Function
+def trim_orphan_nodes() -> str:
+    """Removes any nodes that are not connected to any other nodes - using the Neo4j driver"""
+    
+    neo4j_uri = os.getenv("NEO4J_URI")
+    neo4j_user = os.getenv("NEO4J_USERNAME")
+    neo4j_password = os.getenv("NEO4J_PASSWORD")
+    
+    with GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password)) as driver:
+        cypher_query = "MATCH (n) WHERE NOT (n)--() DELETE n"
+        result = driver.execute_query(cypher_query)
+        return result
 
 # MCP powered functions
 def create_mermaid_graph(usecase: str, entities: list[str] = [], relationships: list[str]= []):
@@ -233,18 +161,7 @@ def create_mermaid_graph(usecase: str, entities: list[str] = [], relationships: 
 
         print(f"Available tools from Stdio MCP server: {[tool.name for tool in tools]}")
                 
-        read_agent = mcp_agent([tools["get_neo4j_schema"], tools["read_neo4j_cypher"]])
-        read_task = read_data_task(read_agent)
-
-        agent = mcp_agent([tools["validate_data_model"], tools["get_mermaid_config_str"]])
-        task = create_mermaid_graph_task(agent, [read_task])
-
-        crew = Crew(
-            agents=[read_agent, agent],
-            tasks=[read_task, task],
-            process=Process.sequential,
-            verbose=True,
-        )
+        crew = CreateMermaidCrew([tools["get_neo4j_schema"], tools["read_neo4j_cypher"],tools["validate_data_model"], tools["get_mermaid_config_str"]]).crew()
 
         inputs = {
             'usecase': usecase,
@@ -260,16 +177,8 @@ def edit_mermaid_graph(instructions: str, mermaid_config: str):
         print(f"Available tools from Stdio MCP server: {[tool.name for tool in tools]}")
         
         try: 
-            agent = mcp_agent([tools["validate_data_model"], tools["get_mermaid_config_str"]])
-
-            task = edit_mermaid_graph_task(agent)
-
-            crew = Crew(
-                agents=[agent],
-                tasks=[task],
-                process=Process.sequential,
-                verbose=True,
-            )
+            
+            crew = EditMermaidCrew([tools["validate_data_model"], tools["get_mermaid_config_str"]]).crew()
             
             inputs = {
                 'instructions': instructions,
@@ -322,18 +231,6 @@ def generate_data(mermaid_graph: str):
             print(f"Error details: {error_trace}")
             raise Exception(f"An error occurred while running the crew: {str(e)}\n\nTraceback:\n{error_trace}")
 
-def trim_orphan_nodes() -> str:
-    """Removes any nodes that are not connected to any other nodes - using the Neo4j driver"""
-    
-    neo4j_uri = os.getenv("NEO4J_URI")
-    neo4j_user = os.getenv("NEO4J_USERNAME")
-    neo4j_password = os.getenv("NEO4J_PASSWORD")
-    
-    with GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password)) as driver:
-        cypher_query = "MATCH (n) WHERE NOT (n)--() DELETE n"
-        result = driver.execute_query(cypher_query)
-        return result
-
 def generate_data_for_usecase(usecase: str):
     "Creates a graph data set from a single usce case prompt"
 
@@ -348,7 +245,7 @@ def generate_data_for_usecase(usecase: str):
 
             # Generate the Data Model
             data_modeling_agent = mcp_agent([tools["validate_data_model"], tools["get_mermaid_config_str"]])
-            data_modeling_task = create_mermaid_graph_task(data_modeling_agent, [schema_task])
+            data_modeling_task = create_mermaid_graph_task_context_only(data_modeling_agent, [schema_task])
             
             # Generate recommended nodes and counts
             cypher_agent = mcp_agent([tools["get_node_cypher_ingest_query"], tools["get_relationship_cypher_ingest_query"]])
@@ -358,7 +255,7 @@ def generate_data_for_usecase(usecase: str):
             write_agent = mcp_agent([tools["write_neo4j_cypher"]])
             write_task = generate_data_task_with_context(write_agent, [cypher_task])
 
-            # Trim any orphaned nodes
+            # Trim any unconnected nodes using MCP Server
             # trim_task = trim_orphan_nodes_task(write_agent)
 
             # Create crew instance with configurations
@@ -375,6 +272,7 @@ def generate_data_for_usecase(usecase: str):
 
             result = crew.kickoff(inputs=inputs)
 
+            # Trim unconnected nodes using Python driver
             trim_orphan_nodes()
 
             return result
@@ -383,7 +281,6 @@ def generate_data_for_usecase(usecase: str):
             error_trace = traceback.format_exc()
             print(f"Error details: {error_trace}")
             raise Exception(f"An error occurred while running the crew: {str(e)}\n\nTraceback:\n{error_trace}")
-
 
 def expand_data_for_usecase(usecase: str):
     with MCPServerAdapter(server_params) as tools:
