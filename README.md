@@ -9,10 +9,16 @@ Sample app using CrewAI + Neo4j's Data Modeling and Cypher MCP Servers to create
 - uv
 
 ## Installation
-
+1. Download or clone this repo
+2. Install dependencies:
 ```
 uv sync
 ```
+3. Create a `.env` file from the `env.example` file:
+```
+cp env.example .env
+```
+4. Add your OpenAI API key and Neo4j connection details to the `.env` file
 
 ## Running
 1. Start Neo4j
